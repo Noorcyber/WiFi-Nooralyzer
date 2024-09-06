@@ -12,12 +12,30 @@ display_wireless_survey_tool() {
 EOF
 }
 
+# Function to check if the wireless interface is up
+check_interface() {
+    local iface=$1
+    if ! ip link show $iface | grep -q "state UP"; then
+        echo "Error: Wireless interface $iface is down. Attempting to bring it up..."
+        ip link set $iface up
+        sleep 2
+        if ! ip link show $iface | grep -q "state UP"; then
+            echo "Failed to bring up the wireless interface $iface. Exiting."
+            exit 1
+        fi
+    fi
+}
+
 # Function to analyze wireless signal strength and interference
 wireless_site_survey() {
+    local iface=$1
     echo "Step 1: Analyzing wireless signal strength and interference..."
 
+    # Check if interface is up
+    check_interface $iface
+
     # Use iw to scan available networks and output details
-    iw dev wlan0 scan > wireless_survey_results.txt
+    iw dev $iface scan > wireless_survey_results.txt
 
     # Extract signal strength, SSID, and other relevant information
     grep "signal\|SSID\|freq" wireless_survey_results.txt > analyzed_results.txt
@@ -33,8 +51,11 @@ main() {
     # Display the design "Wireless Site Survey Tool"
     display_wireless_survey_tool
 
+    # Define the wireless interface (replace with your actual interface name)
+    local wireless_iface="wlan0"
+
     # Run the wireless site survey function
-    wireless_site_survey
+    wireless_site_survey $wireless_iface
     
     echo "Wireless site survey process completed."
 }
