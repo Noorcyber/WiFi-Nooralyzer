@@ -15,13 +15,13 @@ EOF
 # Function to analyze wireless signal strength and interference
 wireless_site_survey() {
     echo "Step 1: Analyzing wireless signal strength and interference..."
-    
-    # Use iwlist to get available networks and their details
-    iwlist scan > wireless_survey_results.txt
-    
-    # Extract signal strength, channel, and other relevant information
-    grep "Signal\|ESSID\|Channel\|Encryption key" wireless_survey_results.txt > analyzed_results.txt
-    
+
+    # Use iw to scan available networks and output details
+    iw dev wlan0 scan > wireless_survey_results.txt
+
+    # Extract signal strength, SSID, and other relevant information
+    grep "signal\|SSID\|freq" wireless_survey_results.txt > analyzed_results.txt
+
     # Display analyzed results
     cat analyzed_results.txt
     
