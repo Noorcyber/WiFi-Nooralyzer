@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 # Function to display the design "Wireless Site Survey Tool"
 display_wireless_survey_tool() {
@@ -8,18 +8,28 @@ display_wireless_survey_tool() {
 ██║ █╗ ██║██║█████╗  ██║    ██╔██╗ ██║██║   ██║██║   ██║██████╔╝███████║██║   ╚████╔╝   ███╔╝ █████╗  ██████╔╝
 ██║███╗██║██║██╔══╝  ██║    ██║╚██╗██║██║   ██║██║   ██║██╔══██╗██╔══██║██║    ╚██╔╝   ███╔╝  ██╔══╝  ██╔══██╗
 ╚███╔███╔╝██║██║     ██║    ██║ ╚████║╚██████╔╝╚██████╔╝██║  ██║██║  ██║███████╗██║   ███████╗███████╗██║  ██║  
-  By Noor Shaheed, Datto, Kaseya. 01/10/2024      Wireless Site Survey Tool V.01
+  By Noor Shaheed, Datto, Kaseya. 01/10/2024      Wireless Site Survey Tool V.02
 EOF
+}
+
+# Function to detect the correct wireless interface
+detect_wireless_interface() {
+    INTERFACE=$(iw dev | awk '$1=="Interface"{print $2}' | head -n 1)
+    if [ -z "$INTERFACE" ]; then
+        echo "Error: No wireless interface detected. Exiting."
+        exit 1
+    fi
+    echo "Detected wireless interface: $INTERFACE"
 }
 
 # Function to check if the wireless interface is up
 check_interface() {
     local iface=$1
-    if ! ip link show $iface | grep -q "state UP"; then
+    if ! ip link show "$iface" | grep -q "state UP"; then
         echo "Error: Wireless interface $iface is down. Attempting to bring it up..."
-        ip link set $iface up
+        ip link set "$iface" up
         sleep 2
-        if ! ip link show $iface | grep -q "state UP"; then
+        if ! ip link show "$iface" | grep -q "state UP"; then
             echo "Failed to bring up the wireless interface $iface. Exiting."
             exit 1
         fi
@@ -32,17 +42,23 @@ wireless_site_survey() {
     echo "Step 1: Analyzing wireless signal strength and interference..."
 
     # Check if interface is up
-    check_interface $iface
+    check_interface "$iface"
 
-    # Use iw to scan available networks and output details
-    iw dev $iface scan > wireless_survey_results.txt
+    # Perform wireless scan
+    iw dev "$iface" scan > /tmp/wireless_survey_results.txt
 
-    # Extract signal strength, SSID, and other relevant information
-    grep "signal\|SSID\|freq" wireless_survey_results.txt > analyzed_results.txt
+    # Extract and format signal strength, SSID, and frequency information
+    echo "Detected Wi-Fi Networks:"
+    echo "-----------------------------------------"
+    echo "Signal Strength | Frequency | SSID"
+    echo "-----------------------------------------"
 
-    # Display analyzed results
-    cat analyzed_results.txt
-    
+    awk '/BSS/ {printf "\n"} 
+         /signal:/ {printf "%-15s | ", $2 $3} 
+         /freq:/ {printf "%-10s | ", $2} 
+         /SSID:/ {print substr($0, index($0,$2))}' /tmp/wireless_survey_results.txt
+
+    echo ""
     echo "Step 1 completed."
 }
 
@@ -51,11 +67,11 @@ main() {
     # Display the design "Wireless Site Survey Tool"
     display_wireless_survey_tool
 
-    # Define the wireless interface (replace with your actual interface name)
-    local wireless_iface="wlan0"
+    # Detect wireless interface
+    detect_wireless_interface
 
     # Run the wireless site survey function
-    wireless_site_survey $wireless_iface
+    wireless_site_survey "$INTERFACE"
     
     echo "Wireless site survey process completed."
 }
