@@ -2,15 +2,21 @@
 
 # Function to detect the correct wireless interface for scanning
 detect_wireless_interface() {
-    # Prioritize 'scan' or 'wlan0', otherwise pick any 'managed' interface
+    # Find a managed (client mode) interface that supports scanning
     INTERFACE=$(iw dev | awk '/Interface/ {iface=$2} /type managed/ {print iface; exit}')
-    
+
+    # If no managed interface is found, fall back to wlan0
     if [ -z "$INTERFACE" ]; then
-        echo "Error: No suitable wireless interface found for scanning. Exiting."
+        INTERFACE="wlan0"
+    fi
+
+    # Double-check that the selected interface exists
+    if ! iw dev | grep -q "$INTERFACE"; then
+        echo "❌ Error: No suitable wireless interface found for scanning. Exiting."
         exit 1
     fi
 
-    echo "✅ Detected wireless scanning interface: $INTERFACE"
+    echo "✅ Using wireless interface for scanning: $INTERFACE"
 }
 
 # Function to check if the wireless interface is up
@@ -39,7 +45,7 @@ wireless_site_survey() {
     iw dev "$iface" scan > /tmp/wireless_survey_results.txt 2>/dev/null
 
     if [ ! -s /tmp/wireless_survey_results.txt ]; then
-        echo "❌ No scan results. Ensure the interface supports scanning."
+        echo "❌ No scan results. Ensure the interface supports scanning and is not in AP mode."
         exit 1
     fi
 
