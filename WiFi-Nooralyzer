@@ -1,36 +1,27 @@
 #!/bin/sh
 
-# Function to display the design "Wireless Site Survey Tool"
-display_wireless_survey_tool() {
-    cat << "EOF"
-██╗    ██╗██╗███████╗██╗    ███╗   ██╗ ██████╗  ██████╗ ██████╗  █████╗ ██╗  ██╗   ██╗███████╗███████╗██████╗ 
-██║    ██║██║██╔════╝██║    ████╗  ██║██╔═══██╗██╔═══██╗██╔══██╗██╔══██╗██║  ╚██╗ ██╔╝╚══███╔╝██╔════╝██╔══██╗
-██║ █╗ ██║██║█████╗  ██║    ██╔██╗ ██║██║   ██║██║   ██║██████╔╝███████║██║   ╚████╔╝   ███╔╝ █████╗  ██████╔╝
-██║███╗██║██║██╔══╝  ██║    ██║╚██╗██║██║   ██║██║   ██║██╔══██╗██╔══██║██║    ╚██╔╝   ███╔╝  ██╔══╝  ██╔══██╗
-╚███╔███╔╝██║██║     ██║    ██║ ╚████║╚██████╔╝╚██████╔╝██║  ██║██║  ██║███████╗██║   ███████╗███████╗██║  ██║  
-  By Noor Shaheed, Datto, Kaseya. 01/10/2024      Wireless Site Survey Tool V.02
-EOF
-}
-
-# Function to detect the correct wireless interface
+# Function to detect the correct wireless interface for scanning
 detect_wireless_interface() {
-    INTERFACE=$(iw dev | awk '$1=="Interface"{print $2}' | head -n 1)
+    # Prioritize 'scan' or 'wlan0', otherwise pick any 'managed' interface
+    INTERFACE=$(iw dev | awk '/Interface/ {iface=$2} /type managed/ {print iface; exit}')
+    
     if [ -z "$INTERFACE" ]; then
-        echo "Error: No wireless interface detected. Exiting."
+        echo "Error: No suitable wireless interface found for scanning. Exiting."
         exit 1
     fi
-    echo "Detected wireless interface: $INTERFACE"
+
+    echo "✅ Detected wireless scanning interface: $INTERFACE"
 }
 
 # Function to check if the wireless interface is up
 check_interface() {
     local iface=$1
     if ! ip link show "$iface" | grep -q "state UP"; then
-        echo "Error: Wireless interface $iface is down. Attempting to bring it up..."
+        echo "⚠️ Wireless interface $iface is down. Bringing it up..."
         ip link set "$iface" up
         sleep 2
         if ! ip link show "$iface" | grep -q "state UP"; then
-            echo "Failed to bring up the wireless interface $iface. Exiting."
+            echo "❌ Failed to bring up the wireless interface $iface. Exiting."
             exit 1
         fi
     fi
@@ -39,42 +30,47 @@ check_interface() {
 # Function to analyze wireless signal strength and interference
 wireless_site_survey() {
     local iface=$1
-    echo "Step 1: Analyzing wireless signal strength and interference..."
+    echo "📡 Step 1: Scanning nearby wireless networks..."
 
-    # Check if interface is up
+    # Ensure the interface is up
     check_interface "$iface"
 
-    # Perform wireless scan
-    iw dev "$iface" scan > /tmp/wireless_survey_results.txt
+    # Perform Wi-Fi scan
+    iw dev "$iface" scan > /tmp/wireless_survey_results.txt 2>/dev/null
 
-    # Extract and format signal strength, SSID, and frequency information
-    echo "Detected Wi-Fi Networks:"
-    echo "-----------------------------------------"
-    echo "Signal Strength | Frequency | SSID"
-    echo "-----------------------------------------"
+    if [ ! -s /tmp/wireless_survey_results.txt ]; then
+        echo "❌ No scan results. Ensure the interface supports scanning."
+        exit 1
+    fi
+
+    # Extract and format signal strength, SSID, and frequency
+    echo ""
+    echo "📡 Detected Wi-Fi Networks:"
+    echo "--------------------------------------------------"
+    echo "Signal Strength | Frequency  | SSID"
+    echo "--------------------------------------------------"
 
     awk '/BSS/ {printf "\n"} 
-         /signal:/ {printf "%-15s | ", $2 $3} 
-         /freq:/ {printf "%-10s | ", $2} 
+         /signal:/ {printf "%-15s | ", $2 " dBm"} 
+         /freq:/ {printf "%-10s | ", $2 " MHz"} 
          /SSID:/ {print substr($0, index($0,$2))}' /tmp/wireless_survey_results.txt
 
     echo ""
-    echo "Step 1 completed."
+    echo "✅ Wireless site survey completed."
 }
 
 # Main function
 main() {
-    # Display the design "Wireless Site Survey Tool"
-    display_wireless_survey_tool
+    echo "===== WiFi-Nooralyzer - Wireless Site Survey Tool ====="
 
-    # Detect wireless interface
+    # Detect the best interface for scanning
     detect_wireless_interface
 
     # Run the wireless site survey function
     wireless_site_survey "$INTERFACE"
     
-    echo "Wireless site survey process completed."
+    echo "🏁 Wireless site survey process completed."
 }
 
-# Call the main function
+# Execute the main function
 main
